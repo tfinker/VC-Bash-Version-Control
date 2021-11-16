@@ -1,0 +1,57 @@
+#!/bin/bash
+
+echo $1
+echo "$2"
+
+if [[ $# -eq 0 ]];
+then
+	echo "No parameters provided"
+	exit 0
+fi
+
+function add {
+	echo 'add function'
+
+	if [[ -z $1 ]]; then
+		echo "Add: No file provided"
+		exit 0
+	fi
+
+	if [[ ! -f $1 ]]; then
+		echo "Add: File '$1' doesn't exist"
+		exit 0
+	fi
+
+	if [[ ! -d '.staging' ]]; then
+		mkdir './.staging'
+	fi
+	cp $1 ./.staging/
+
+}
+
+function commit {
+	echo 'commit function'
+
+	if [[ -z $1 ]]; then
+		echo "Commit: no message provided"
+		exit 0
+	fi
+	
+	commitMil=$"c"$(date +"%s%3N")
+	commitDate=$(date)
+	echo $commitMil
+	echo $commitDate
+	mkdir -p ./.commit/$commitMil 
+
+	cp ./.staging/* ./.commit/$commitMil
+	echo "Commit date: "$commitDate >> ./.commit/$commitMil/.commitInfo
+	echo "Message: "$1 >> ./.commit/$commitMil/.commitInfo
+	chmod 444 ./.commit/$commitMil/*
+	rm -r ./.staging
+}
+
+if [ $1 == 'add' -o $1 == '-a' ]; then
+	add $2
+elif [ $1 == 'commit' -o $1 == '-c' ]; then
+	commit $2
+fi
