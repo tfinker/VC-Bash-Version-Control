@@ -1,0 +1,36 @@
+#!/bin/awk
+BEGIN {
+	block=0
+}
+#{printf("%s %s", $0, "\n")}
+ 	{
+		if ($0 ~ /[0-9]{1}(,[0-9])?[acd]{1}[0-9]{1}(,[0-9])?/ && block == 1){
+
+			#printf("%s %s %s", $0, "exit", "\n")
+			exit
+		}
+		if($0 ~ /[0-9]{1}(,[0-9])?[acd]{1}[0-9]{1}(,[0-9])?/ && block == 0){
+			#printf("%s", "block\n")
+			block=1
+			match($0, /[acd]/, action)
+			split($0, lines, /[acd]/)
+	#		printf("%s %s %s%s", lines[1], action[0], lines[2],"\n")
+		}
+	 }
+#NF>0	{printf("%s %s", $0, "\n")}
+ 	{if($1 ~ /</){ remove[$0] }}
+ 	{if($1 ~ />/){ add[$0] }}
+END {
+	printf("%s%s", action[0], "\n")
+	printf("%s%s", lines[1], "\n")
+	printf("%s%s", lines[2], "\n")
+	for(line in remove){
+		printf("%s%s", line, "\n")
+	}
+	printf("%s", "----*----\n")
+	for(line in add){
+		printf("%s%s", line, "\n")
+		}
+}
+
+

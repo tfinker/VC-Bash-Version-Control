@@ -1,8 +1,5 @@
 #!/bin/bash
 
-echo $1
-echo "$2"
-
 if [[ $# -eq 0 ]];
 then
 	echo "No parameters provided"
@@ -29,6 +26,28 @@ function add {
 
 }
 
+function list {
+	echo 'list function'
+
+	if [[ -d './.staging' ]]; then
+		echo "---------- Files in staging: ----------"	
+		ls ./.staging
+		echo "---------- End files in staging: ----------"	
+	else
+		echo "No files in staging"
+	fi
+
+	if [[ -d './.commit' ]]; then
+		echo "---------- Committed files: ----------"	
+		ls ./.commit
+		echo "---------- End Committed files: ----------"	
+	else
+		echo "No committed files"
+	fi
+	
+
+}
+
 function commit {
 	echo 'commit function'
 
@@ -37,21 +56,63 @@ function commit {
 		exit 0
 	fi
 	
-	commitMil=$"c"$(date +"%s%3N")
-	commitDate=$(date)
-	echo $commitMil
-	echo $commitDate
-	mkdir -p ./.commit/$commitMil 
+	# commitDate=$(date)
+	# echo $commitDate
+	mkdir -p ./.commit/ 
 
-	cp ./.staging/* ./.commit/$commitMil
-	echo "Commit date: "$commitDate >> ./.commit/$commitMil/.commitInfo
-	echo "Message: "$1 >> ./.commit/$commitMil/.commitInfo
-	chmod 444 ./.commit/$commitMil/*
-	rm -r ./.staging
+	# get list of files in staging
+	# individually compare with those in .commit
+	# if same filename, run merge function
+	# otherwise copy file to .commit
+
+	stagingfiles=($(ls .staging))
+	commitfiles=($(ls .commit))
+	echo ${stagingfiles[@]}
+	echo ${commitfiles[@]}
+
+	for file in ${stagingfiles[@]}
+	do
+		echo $file
+		if [[ -f .commit/$file ]]; then
+			merge $file
+		else
+			cp .staging/$file .commit
+		fi
+	done
+	#echo "Commit date: "$commitDate > ./.commit/.commitInfo
+	#echo "Message: "$1 >> ./.commit/.commitInfo
+	#chmod 444 ./.commit/*
+	#rm -r ./.staging
+}
+
+function merge {
+	echo 'merging '$1
+	echo 'File "'$1'" already exists in repository'
+	# handle if file is identical
+	read -p 'Do you want to overwrite (1) or merge (2)? ' action
+	case $action in
+		"1")
+			cp $1 .commit
+			;;
+		"2")
+#			diff ./.commit/$1 ./.staging/$1 >> ./.staging/differences
+			difference=$(diff -c ./.commit/$1 ./.staging/$1)
+			for diff in ${difference[@]}
+			do
+				echo $diff
+			done
+			;;
+		*)
+			echo 'wrong action entered'
+			;;
+	esac
+
 }
 
 if [ $1 == 'add' -o $1 == '-a' ]; then
 	add $2
+elif [ $1 == 'list' -o $1 == '-l' ]; then
+	list
 elif [ $1 == 'commit' -o $1 == '-c' ]; then
 	commit $2
 fi
