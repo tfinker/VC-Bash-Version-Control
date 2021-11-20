@@ -1,6 +1,11 @@
 #!/bin/awk
 BEGIN {
 	block=0
+	system("rm -f .commit/.action.merge")
+	system("rm -f .commit/.start.merge")
+	system("rm -f .commit/.finish.merge")
+	system("rm -f .commit/.remove.merge")
+	system("rm -f .commit/.add.merge")
 }
 #{printf("%s %s", $0, "\n")}
  	{
@@ -10,7 +15,7 @@ BEGIN {
 			exit
 		}
 		if($0 ~ /[0-9]{1}(,[0-9])?[acd]{1}[0-9]{1}(,[0-9])?/ && block == 0){
-			#printf("%s", "block\n")
+			#<printf("%s", "block\n")
 			block=1
 			match($0, /[acd]/, action)
 			split($0, lines, /[acd]/)
@@ -18,19 +23,43 @@ BEGIN {
 		}
 	 }
 #NF>0	{printf("%s %s", $0, "\n")}
- 	{if($1 ~ /</){ remove[$0] }}
- 	{if($1 ~ />/){ add[$0] }}
+ 	{if($1 ~ /</){ 
+		print substr($0,3) >> ".commit/.remove.merge"
+	}}
+ 	{if($1 ~ />/){ 
+		print substr($0,3) >> ".commit/.add.merge"
+	}}
 END {
 	printf("%s%s", action[0], "\n")
-	printf("%s%s", lines[1], "\n")
-	printf("%s%s", lines[2], "\n")
-	for(line in remove){
-		printf("%s%s", line, "\n")
+	print action[0] >> ".commit/.action.merge"
+	
+	
+	# create a uniform line format ("start,end")
+	if ( lines[1] ~ /[,]/ ) {
+	#	printf("%s%s", lines[1], "\n")
+		split (lines[1], rlines, /[,]/)
+		print rlines[1] >> ".commit/.start.merge"
+		print rlines[2] >> ".commit/.start.merge"
 	}
-	printf("%s", "----*----\n")
-	for(line in add){
-		printf("%s%s", line, "\n")
-		}
+	else { 
+	#	printf("%s%s", lines[1]","lines[1], "\n")
+		print lines[1] >> ".commit/.start.merge"
+		print lines[1] >> ".commit/.start.merge"
+	       
+	}
+	if ( lines[2] ~ /[,]/ ) {
+	#	printf("%s%s", lines[2], "\n")
+		split (lines[2], alines, /[,]/)
+		print alines[1] >> ".commit/.finish.merge"
+		print alines[2] >> ".commit/.finish.merge"
+
+	}
+	else {  
+	#	printf("%s%s", lines[2]","lines[2], "\n")
+		print lines[2] >> ".commit/.finish.merge"
+		print lines[2] >> ".commit/.finish.merge"
+	}
+		
 }
 
 

@@ -89,21 +89,75 @@ function merge {
 	echo 'merging '$1
 	echo 'File "'$1'" already exists in repository'
 	# handle if file is identical
-	read -p 'Do you want to overwrite (1) or merge (2)? ' action
-	case $action in
+	read -p 'Do you want to overwrite (1) or merge (2)? ' userAction
+	case $userAction in
 		"1")
 			cp $1 .commit
 			;;
 		"2")
-#			diff ./.commit/$1 ./.staging/$1 >> ./.staging/differences
-			difference=$(diff -c ./.commit/$1 ./.staging/$1)
-			for diff in ${difference[@]}
-			do
-				echo $diff
-			done
+			cp .staging/$1 .commit/.$1.merging
+			compare=$(diff -q .commit/.$1.merging .commit/$1)
+			echo $compare
+			while [[ $compare != ""  ]]; do
+				diff ".commit/$1" ".commit/.$1.merging" | awk -f awkdiff
+				mergeAction=$(sed "1q;d" .commit/.action.merge)
+				echo $mergeAction		
+				blockMerge $1 $mergeAction
+#				rm .commit/$1.changes
+				compare=$(diff -q .commit/.$1.merging .commit/$1)
+				break
+			done	
 			;;
 		*)
 			echo 'wrong action entered'
+			;;
+	esac
+
+}
+
+
+function blockMerge {
+	case $2 in
+		"a")
+			finishLocs=($(sed -n "1,2p" .commit/.finish.merge))
+			if [[ ${finishLocs[0]} -le 1 ]]; then
+				startView=1
+			else
+				startView=$(( ${finishLocs[0]}-1 ))
+			fi
+			endView=$(( ${finishLocs[1]}+1 )) 
+			sed -n "$startView,$endView p" <.commit/.$1.merging >.commit/.display.merge
+			sed -i "${finishLocs[0]},${finishLocs[1]} s/.*/>>>> &/" .commit/.display.merge
+			cat .commit/.display.merge | awk -v N=$startView -f awklinenumber
+			
+			printf "Do you want to add the following >>>> lines at line(s): ${finishLocs[0]}-${finishLocs[1]} (Y/n) ?\n "
+			printf "\n"
+			cat .commit/.display.merge 
+		 	printf "\n"
+			
+			read -p "Enter (Y/n): " userAction
+			case $userAction in
+				[Yy])
+					echo "adding"
+					sed -ie "${finishLocs[0]}r .commit/.add.merge" .commit/$1
+					;;
+				[Nn])
+					echo "not adding"
+					loc=${finishLocs[0]}","${finishLocs[1]}"d"
+					sed -i $loc .commit/.$1.merging
+					;;
+			esac
+
+			;;
+		"c")
+			removeLocation=$(sed "2q;d" .commit/$1.changes)
+			linesToRemove=$(sed "4q;d" .commit/$1.changes)
+			addLocation=$(sed "3q;d" .commit/$1.changes)
+			linesToAdd=$(sed "5q;d" .commit/$1.changes)
+			printf "Do you want to change the following lines at lines(s): $removeLocation (Y/n)  \n ---------from --------- \n$linesToRemove\n ----------- to ----------- \n$linesToAdd\n"
+			read userAction
+			;;
+		"d")
 			;;
 	esac
 
@@ -116,3 +170,5 @@ elif [ $1 == 'list' -o $1 == '-l' ]; then
 elif [ $1 == 'commit' -o $1 == '-c' ]; then
 	commit $2
 fi
+
+
