@@ -58,18 +58,36 @@ function list {
 }
 
 function commit {
-	echo 'commit function'
+#	echo 'commit function'
 
 	if [[ -z $1 ]]; then
 		echo "Commit: no message provided"
 		exit 0
 	fi
 	
-	# commitDate=$(date)
-	# echo $commitDate
-	if [[ ! -d '.commit' ]]; then
-		mkdir ./.commit/ 
+	commitName=$"c"$(date +"%s%3N")
+	commitDate=$(date)
+#	echo $commitName
+#	echo $commitDate
+	mkdir -p ./.commit
+	# copy last committed files into new folder
+	commitDirs=($(ls ./.commit))
+		
+	lastCommit=0
+	for commit in ${commitDirs[@]}; do
+		dir=${commit:1}
+		if [[ $dir -gt $lastCommit ]]; then
+			#echo "last commit $lastCommit dir $dir"
+			lastCommit=$dir
+		fi
+	done
+
+	mkdir -p ./.commit/$commitName
+	if [[ $lastCommit -ne 0 ]]; then
+#		echo "last commit found"
+		cp -r .commit/c$lastCommit/. ./.commit/$commitName/
 	fi
+	
 
 	# get list of files in staging
 	# individually compare with those in .commit
@@ -77,16 +95,24 @@ function commit {
 	# otherwise copy file to .commit
 
 	stagingfiles=($(ls .staging))
-	commitfiles=($(ls .commit))
+	commitfiles=($(ls .commit/$commitName))
 	#echo ${stagingfiles[@]}
 	#echo ${commitfiles[@]}
-
+	
+	printf "Creating new commit: $commitName \n"
+# show list of staging files?
+	printf "Staged files: \n"
+	for file in ${stagingfiles[@]};
+	do
+		printf "\t$file\n"
+	done
+	printf "\n"
 	for file in ${stagingfiles[@]}
 	do
-		if [[ -f .commit/$file ]]; then
-			merge $file
-		else
-			cp .staging/$file .commit
+		if [[ -f .commit/$commitName/$file ]]; then
+			merge $file $commitName
+		else		
+			cp .staging/$file .commit/$commitName/
 		fi
 	done
 	#echo "Commit date: "$commitDate > ./.commit/.commitInfo
@@ -96,21 +122,21 @@ function commit {
 }
 
 function merge {
-	#echo 'merging '$1
-	echo 'File "'$1'" already exists in repository'
-	compare=$(diff -q .commit/.$1.merging .commit/$1)
+	printf "File '$1' exists in last commit "
+	compare=$(diff -q .staging/$1 .commit/$2/$1)
 	if [[ $compare == "" ]]; then
-		echo "Files are identical"
+		echo "and the files are identical"
 	else
-		echo "Files are not identical"
+		echo "but the files are not identical"
 	fi
 	mergeComplete="false"
 	while [[ $mergeComplete != true ]]; do
-	read -p 'Do you want to overwrite (1) or merge (2)? ' userAction
+		printf "Do you want to overwrite (1) or merge (2) '$1' ? "
+		read userAction
 
 		case $userAction in
 			"1")
-				cp .staging/$1 .commit/$1
+				cp .staging/$1 .commit/$2/$1
 				mergeComplete=true
 				echo "File $1 overwritten"
 				;;
@@ -118,14 +144,13 @@ function merge {
 				# create a copy of the staging file
 				# process will iteratively align the commit file and the staging file until there
 				# are no differences left between the two
-				cp .staging/$1 .commit/.$1.merging
-				compare=$(diff -q .commit/.$1.merging .commit/$1)
+				cp .staging/$1 .commit/$2/.$1.merging
+				compare=$(diff -q .commit/$2/.$1.merging .commit/$2/$1)
 				while [[ $compare != ""  ]]; do
-					diff ".commit/$1" ".commit/.$1.merging" | awk -f awkdiff
+					diff ".commit/$2/$1" ".commit/$2/.$1.merging" | awk -f awkdiff
 					mergeAction=$(sed "1q;d" .commit/.action.merge)
-			#		echo $mergeAction		
-					blockMerge $1 $mergeAction
-					compare=$(diff -q .commit/.$1.merging .commit/$1)
+					blockMerge $1 $2 $mergeAction 
+					compare=$(diff -q .commit/$2/.$1.merging .commit/$2/$1)
 				done	
 				$mergeComplete=true
 				echo "Merge complete"
@@ -139,7 +164,7 @@ function merge {
 
 
 function blockMerge {
-	case $2 in 
+	case $3 in 
 		"a")
 #			startLocs=($(sed -n "1,2p" .commit/.start.merge))
 			finishLocs=($(sed -n "1,2p" .commit/.finish.merge))
@@ -164,16 +189,16 @@ function blockMerge {
 			case $userAction in
 				[Yy])
 			
-					lines=($(wc -l .commit/$1))
+					lines=($(wc -l .commit/$2/$1))
 					if test ${lines[0]} -lt ${finishLocs[0]}; then
-						cat .commit/.add.merge >> .commit/$1
+						cat .commit/.add.merge >> .commit/$2/$1
 					else			
-						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$1
+						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$2/$1
 					fi
 					;;
 				[Nn])
 					loc=${finishLocs[0]}","${finishLocs[1]}"d"
-					sed -i $loc .commit/.$1.merging
+					sed -i $loc .commit/$2/.$1.merging
 					;;
 			esac
 
@@ -194,25 +219,25 @@ function blockMerge {
 				[Yy])
 					#echo "del"
 					
-					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$1
+					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$2/$1
 					#echo "add ${finishLocs[0]}"
 					#sed -i "${finishLocs[0]}i\\$(cat .commit/.add.merge)" .commit/$1
-					lines=($(wc -l .commit/$1))
+					lines=($(wc -l .commit/$2/$1))
 					if test ${lines[0]} -lt ${finishLocs[0]}; then
-						cat .commit/.add.merge >> .commit/$1
+						cat .commit/.add.merge >> .commit/$2/$1
 					else			
-						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$1
+						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$2/$1
 					fi
 					#echo "done"
 					;;
 				[Nn])
 					echo "not replacing" ${startLocs[0]},${startLocs[1]},${finishLocs[0]},${finishLocs[1]}
-					sed -i "${finishLocs[0]},${finishLocs[1]}d" .commit/.$1.merging
-					lines=($(wc -l .commit/.$1.merging))
+					sed -i "${finishLocs[0]},${finishLocs[1]}d" .commit/$2/.$1.merging
+					lines=($(wc -l .commit/$2/.$1.merging))
 					if test ${lines[0]} -lt ${startLocs[0]}; then
-						cat .commit/.remove.merge >> .commit/.$1.merging
+						cat .commit/.remove.merge >> .commit/$2/.$1.merging
 					else			
-						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/.$1.merging
+						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/$2/.$1.merging
 					fi
 					;;
 			esac
@@ -230,15 +255,15 @@ function blockMerge {
 			case $userAction in 
 				[Yy])
 					echo "del yes"	${startLocs[0]},${startLocs[1]}d
-					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$1
+					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$2/$1
 					;;
 				[Nn])
 					echo "del no"
-					lines=($(wc -l .commit/.$1.merging))
+					lines=($(wc -l .commit/$2/.$1.merging))
 					if test ${lines[0]} -lt ${startLocs[0]}; then
-						cat .commit/.remove.merge >> .commit/.$1.merging
+						cat .commit/.remove.merge >> .commit/$2/.$1.merging
 					else			
-						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/.$1.merging
+						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/$2/.$1.merging
 					fi
 					;;
 			esac
