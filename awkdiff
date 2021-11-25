@@ -30,7 +30,7 @@ BEGIN {
  	{if($1 ~ />/){ 
 		print substr($0,3) >> ".commit/.add.merge"
 	}}
-NR>1 {print $0 >> ".commit/.display.merge"}
+NR>1 {print "\t"$0 >> ".commit/.display.merge"}
 END {
 #	printf("%s%s", action[0], "\n")
 	print action[0] >> ".commit/.action.merge"
