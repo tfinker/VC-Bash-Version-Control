@@ -460,7 +460,7 @@ Command: vc display
 if [[ $# -eq 0 ]];
 then
 	printf "No parameters provided\n\n"
-	printf "Enter --help for details\n"
+	printf "Enter vc help for details\n"
 	exit 0
 fi
 
