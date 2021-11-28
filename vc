@@ -1,116 +1,163 @@
 #!/bin/bash
 
-if [[ $# -eq 0 ]];
-then
-	echo "No parameters provided"
-	exit 0
-fi
-
 function add {
 
-	if [[ -z $1 ]]; then
+	if [[ ${#argArray[@]} -eq 0 ]];then
+		printf "Add: No arguments provided\n"
+		exit 0
+	fi
+
+	if [[ -v "argArray[all]" ]]; then
+		toCopy=*
+	elif [[ -v "argArray[file]" ]]; then
+		toCopy=${argArray[file]}
+		if [[ ! -f $toCopy ]]; then
+			echo "Add: File '${argArray[file]}' doesn't exist"
+			exit 0
+		fi
+	else
 		echo "Add: No file provided"
 		exit 0
 	fi
 
-	if [[ ! -f $1 ]]; then
-		echo "Add: File '$1' doesn't exist"
-		exit 0
-	fi
 
 	if [[ ! -d '.staging' ]]; then
 		mkdir './.staging'
 	fi
-	cp $1 ./.staging/
+	cp -r $toCopy ./.staging/
 
-	printf "$1 added to staging\n"
+	if [[ -v "argArray[all]" ]];then
+		printf "All files in directory added to staging\n"
+	else
+		printf "$toCopy added to staging\n"
+	fi
 }
 
-function list {
+function listStaging {
+
+	printf "Files in staging \n"	
 	printf "\n"
-	exit=false
-	while [[ $exit = false ]]; do
-		printf "List files: Please select an option\n\t1: files in staging\n\t2: files in the last commit\n\t3: files in an older commit\n\t4: exit \nOption:  "
-		read userAction
+	unset fileDir
+	if [[ -d './.staging' ]]; then
+		index=0
+		files=($(ls ./.staging))
+		for line in ${files[@]}; do
+			printf "\t- $index: $line\n"
+			fileDir[index]=".staging/$line"
+			(( index = index+1 ))
+		done
+	else
+		printf "\tNo files in staging\n"
+	fi	
+	printf "\n"
+}
+
+function listLastCommit {
+	printf "Files in last commit \n"	
+	printf "\n"
+	if [[ -d './.commit' ]]; then
+		commits=($(ls .commit/ | sort -r))
+		if [[ ! -z $commits ]];then
+			files=($(ls .commit/${commits[0]}/))		
+			index=0
+			unset fileDir
+			printf "Files in last commit '${commits[0]}':\n"
+			for line in ${files[@]}; do
+				printf "\t- $index: $line\n"
+				fileDir[index]=".commit/${commits[0]}/$line"
+				(( index = index+1 ))
+			done
+		else
+			printf "\tNo files in commit\n"
+		fi
+	else
+		printf "\tNo files in commit\n"
+	fi
+	printf "\n"
+
+}
+
+function listCommits {
+	printf "Files in commit \n"	
+	printf "\n"
+	if [[ -d './.commit' ]]; then
+		commits=($(ls .commit/ | sort -r))
+		if [[ ! -z $commits ]]; then
+			printf "Select a commit to view: \n"
+			unset fileDir
+			index=1
+			for commit in ${commits[@]}; do
+				printf "\t$index: $commit\n"
+				(( index = index+1 ))
+			done
+			read -p "Enter option: " userAction
+			printf "\n"
+			choice=$(( $userAction-1 ))
+			files=($(ls .commit/${commits[$choice]}))
+			index=0
+			cat .commit/${commits[$choice]}/.commitInfo
+			printf "Files in commit: '${commits[$choice]}'\n"
+			for file in ${files[@]}; do
+				printf "\t- $index: $file\n"
+				fileDir[index]=".commit/${commits[$choice]}/$file"
+				(( index = index +1 ))
+			done
+			printf "\n"
+		else
+			printf "\tNo files in commit\n"
+		fi
+	else
+		printf "\tNo files in commit\n"
+	fi
+
+}
+
+
+function list {
+	if test ${#argArray[@]}  -gt 0; then
+		for arg in ${!argArray[@]}; do
+			case $arg in
+				staging) listStaging ;;
+				last) listLastCommit ;;
+				commits) listCommits ;;
+			esac
+			printf "****\n"
+		done
+	else	
 		printf "\n"
-		case $userAction in
-			"1") 
-	
-				printf "Files in staging \n"	
-				printf "\n"
-				if [[ -d './.staging' ]]; then
-					index=0
-					files=($(ls ./.staging))
-					for line in ${files[@]}; do
-						printf "\t- $index: $line\n"
-				      		(( index = index+1 ))
-					done
-				else
-					printf "\tNo files in staging\n"
-				fi	
-		
-			
-				printf "\n"
-				;;
-			"2")
-				if [[ -d './.commit' ]]; then
-					commits=($(ls .commit/ | sort -r))
-					if [[ ! -z $commits ]];then
-						files=($(ls .commit/${commits[0]}/))		
-						index=0
-						printf "Files in last commit '${commits[0]}':\n"
-						for line in ${files[@]}; do
-							printf "\t- $index: $line\n"
-				      			(( index = index+1 ))
-						done
-					else
-						printf "\tNo files in commit\n"
-					fi
-				else
-					printf "\tNo files in commit\n"
-				fi
-				printf "\n"
-				;;
-			"3")
-				if [[ -d './.commit' ]]; then
-					commits=($(ls .commit/ | sort -r))
-					if [[ ! -z $commits ]]; then
-						printf "Select a commit to view: \n"
-						index=1
-						for commit in ${commits[@]}; do
-							printf "\t$index: $commit\n"
-							(( index = index+1 ))
-						done
-						read -p "Enter option: " userAction
-						printf "\n"
-						choice=$(( $userAction-1 ))
-						files=($(ls .commit/${commits[$choice]}))
-						printf "Files in commit '${commits[$choice]}':\n"
-						index=0
-						for file in $files; do
-							printf "\t- $index: $file\n"
-							(( index = index +1 ))
-						done
-						printf "\n"
-					else
-						printf "\tNo files in commit\n"
-					fi
-				else
-					printf "\tNo files in commit\n"
-				fi
-				;;
-			"4")
-				exit=true
-				;;	
-			"*")
-				printf "Wrong action entered\n"
-				;;
-		esac
-	done
+		exit=false
+		while [[ $exit = false ]]; do
+			printf "List files: Please select an option\n\t1: files in staging\n\t2: files in the last commit\n\t3: files in an older commit\n\t4: exit \nOption:  "
+			read userAction
+			printf "\n"
+			case $userAction in
+				"1") 
+					listStaging	
+					;;
+				"2")
+					listLastCommit
+					;;
+				"3")
+					listCommits
+					;;
+				"4")
+					exit=true
+					;;	
+				"*")
+					printf "Wrong action entered\n"
+					;;
+			esac
+		done
+	fi
 }
 
 function commit {
 #	echo 'commit function'
+	
+	if [[ ${#argArray[@]} -eq 0 ]];then
+		printf "Commit: no arguments provided\n"
+		exit 0
+	fi
 
 	if [[ ! -d ./.staging ]]; then
 		echo "No files in staging"
@@ -121,8 +168,8 @@ function commit {
 		echo "No files in staging"
 		exit 0
 	fi
-
-	if [[ -z $1 ]]; then
+	
+	if [[ ${!argArray[@]} != 'msg' ]]; then
 		echo "Commit: no message provided"
 		exit 0
 	fi
@@ -178,9 +225,9 @@ function commit {
 	done
 
 	echo "Commit date: "$commitDate > ./.commit/$commitName/.commitInfo
-	echo "Message: "$1 >> ./.commit/$commitName/.commitInfo
-#	chmod 444 ./.commit/$commitName/
-#	rm -r ./.staging
+	echo "Message: "${argArray[0]} >> ./.commit/$commitName/.commitInfo
+	#chmod 444 ./.commit/$commitName/
+	rm -r ./.staging
 	echo "Commit complete"
 }
 
@@ -339,12 +386,149 @@ function blockMerge {
 
 }
 
-if [ $1 == 'add' -o $1 == '-a' ]; then
-	add $2
-elif [ $1 == 'list' -o $1 == '-l' ]; then
+function display {
+
+	if test ${#argArray[@]} -eq 1; then
+		case ${!argArray[@]} in
+			staging) listStaging ;;
+			last) listLastCommit ;;
+			commits) listCommits;;
+		esac
+	      	read -p "Please enter a file number to view file: " userAction
+		length=($(wc -l ${fileDir[$userAction]}))
+		if [[ ${length[0]} -lt 30 ]]; then
+			increment=${length[0]}
+		else
+			increment=30
+		fi
+		printf "Printing file: ${fileDir[$userAction]}\n"
+		printf "Press any key to cycle through pages\n"
+		printf "Number of lines in file: ${length[0]}\n"
+		for (( i=1 ; i <= ${length[0]};i=$(($i+$increment)) )); do
+			end=$(($i+$increment))
+			cat ${fileDir[$userAction]} | awk 'NR >='$i' && NR <'$end' {print NR":",$0}'
+			read 	
+		done
+
+	else
+		if test ${#argArray[@]} -eq 0; then
+			printf "Please specify a flag for the display function:\n\t-s (staging folder)\n\t-l (last commit folder)\n\t-c (choose commit)\n"
+		elif	test ${#argArray[@]} -gt 1; then
+			printf "Please only specify one flag for this function\n"
+		fi
+	fi	
+}
+
+function man {
+	printf "vc help\n
+Usage: vc [COMMAND] [OPTION]
+	Description: Version control your files with vc
+
+Command: vc add
+	Description: Add files to staging area
+	Usage:
+		vc add -f FILE (add a specific file)
+		vc add -a (add all files in directory)
+
+Command: vc list
+	Description: List all files in relevant folders
+	Usage:
+		vc list 	(user is given an interactive display)
+		vc list -s 	(list all files in staging)
+		vc list -l 	(list all files in the last commit)
+		vc list -c 	(choose which commit to view)
+	
+Command: vc commit
+	Description: Add all files in staging to a commit. If there are
+		differences between files, a merge procedure will be initiated.
+	Usage:
+		vc commit -m MESSAGE (Commit all files with a commit message)
+
+Command: vc display
+	Description: Display paginated contents of staged and committed files 
+		in the repository
+	Usage:
+		vc display -s 	(choose a file to view from staging)
+		vc display -l 	(choose a file to view from the last commit)
+		vc display -c 	(choose a file to view from any commit)
+
+
+	"
+}
+
+
+if [[ $# -eq 0 ]];
+then
+	printf "No parameters provided\n\n"
+	printf "Enter --help for details\n"
+	exit 0
+fi
+
+case $1 in
+	"add"|"list"|"commit"|"display"|"help")
+		action=$1
+		shift
+		;;
+	*)
+		printf "No command provided\nPlease enter 'vc help' for more information\n"
+		exit
+		;;
+esac
+
+declare -a fileDir
+declare -A argArray
+
+if [ $action == 'add' ]; then
+
+	while getopts 'af:' flag; do
+		case $flag in
+			a)
+				argArray[all]=true 
+				if [[ -v "argArray[file]" ]]; then
+					unset $argArray[file]
+				fi
+				break
+				;;
+				
+			f) 
+				argArray[file]=${OPTARG} ;;
+		esac
+	done
+	add 
+	
+elif [ $action == 'list' ]; then
+	
+	while getopts 'slc' flag; do
+		case $flag in
+			s) argArray[staging]=true ;;
+			l) argArray[last]=true ;;
+			c) argArray[commits]=true ;;
+		esac
+	done
 	list
-elif [ $1 == 'commit' -o $1 == '-c' ]; then
-	commit $2
+
+elif [ $action == 'commit' ]; then
+	
+	while getopts 'm:' flag; do
+		case $flag in
+			m) argArray[msg]=${OPTARG} ;;
+		esac
+	done
+	commit 
+
+elif [ $action == 'display' ]; then
+	
+	while getopts 'slc' flag; do
+		case $flag in
+			s) argArray[staging]=true ;;
+			l) argArray[last]=true ;;
+			c) argArray[commits]=true ;;
+		esac
+	done
+	display
+
+elif [ $action == 'help' ]; then
+	man
 fi
 
 
