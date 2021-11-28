@@ -7,7 +7,15 @@ function add {
 		exit 0
 	fi
 
-	if [[ -v "argArray[all]" ]]; then
+	if [[ -v "argArray[clear]" ]]; then
+		if [[ -d '.staging' ]]; then
+			rm -r .staging
+			printf "Staged files removed\n"
+		else
+			printf "No staged files to remove\n"
+		fi
+		exit 0
+	elif [[ -v "argArray[all]" ]]; then
 		toCopy=*
 	elif [[ -v "argArray[file]" ]]; then
 		toCopy=${argArray[file]}
@@ -480,7 +488,7 @@ declare -A argArray
 
 if [ $action == 'add' ]; then
 
-	while getopts 'af:' flag; do
+	while getopts 'caf:' flag; do
 		case $flag in
 			a)
 				argArray[all]=true 
@@ -492,6 +500,8 @@ if [ $action == 'add' ]; then
 				
 			f) 
 				argArray[file]=${OPTARG} ;;
+			c)
+				argArray[clear]=true ;;
 		esac
 	done
 	add 
