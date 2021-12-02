@@ -1,8 +1,0 @@
-#!/bin/awk
-
-BEGIN {
-	lineNum=N
-	system("rm -f .commit/.display.merge")
-}
-{ print lineNum": "$0 >> ".commit/.display.merge" }
-{ lineNum+=1 }

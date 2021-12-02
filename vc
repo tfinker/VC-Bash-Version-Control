@@ -132,30 +132,7 @@ function list {
 			printf "****\n"
 		done
 	else	
-		printf "\n"
-		exit=false
-		while [[ $exit = false ]]; do
-			printf "List files: Please select an option\n\t1: files in staging\n\t2: files in the last commit\n\t3: files in an older commit\n\t4: exit \nOption:  "
-			read userAction
-			printf "\n"
-			case $userAction in
-				"1") 
-					listStaging	
-					;;
-				"2")
-					listLastCommit
-					;;
-				"3")
-					listCommits
-					;;
-				"4")
-					exit=true
-					;;	
-				"*")
-					printf "Wrong action entered\n"
-					;;
-			esac
-		done
+		printf "No arguments provided\nPlease specify one of the following:\n\t-s: staging\n\t-l: last commit\n\t-c: interactively select a commit\n"
 	fi
 }
 
@@ -227,13 +204,13 @@ function commit {
 		if [[ -f .commit/$commitName/$file ]]; then
 			merge $file $commitName
 		else		
-			cp .staging/$file .commit/$commitName/
+			cp -r .staging/$file .commit/$commitName/
 			printf "\t$file added to commit\n"
 		fi
 	done
 
 	echo "Commit date: "$commitDate > ./.commit/$commitName/.commitInfo
-	echo "Message: "${argArray[0]} >> ./.commit/$commitName/.commitInfo
+	echo "Message: "${argArray[msg]} >> ./.commit/$commitName/.commitInfo
 	#chmod 444 ./.commit/$commitName/
 	rm -r ./.staging
 	echo "Commit complete"
@@ -268,7 +245,7 @@ function merge {
 
 		case $userAction in
 			"1")
-				cp .staging/$1 .commit/$2/$1
+				cp -r .staging/$1 .commit/$2/$1
 				mergeComplete=true
 				echo "File $1 overwritten"
 				;;
@@ -367,7 +344,6 @@ function blockMerge {
 			;;
 		"d")
 			startLocs=($(sed -n "1,2p" .commit/.start.merge))
-			finishLocs=($(sed -n "1,2p" .commit/.finish.merge))	
 			printf "Do you want to delete the following lines at line(s): ${startLocs[0]}-${startLocs[1]} (Y/n) ?\n "
 			printf "\n"
 			cat .commit/.display.merge
@@ -427,7 +403,7 @@ function display {
 	fi	
 }
 
-function man {
+function help {
 	printf "vc help\n
 Usage: vc [COMMAND] [OPTION]
 	Description: Version control your files with vc
@@ -467,8 +443,8 @@ Command: vc display
 
 if [[ $# -eq 0 ]];
 then
-	printf "No parameters provided\n\n"
-	printf "Enter vc help for details\n"
+	printf "vc\nNo parameters provided\n\n"
+	printf "Please enter 'vc help' for more information\n"
 	exit 0
 fi
 
@@ -478,7 +454,7 @@ case $1 in
 		shift
 		;;
 	*)
-		printf "No command provided\nPlease enter 'vc help' for more information\n"
+		printf "vc\nIncorrect command provided\nPlease enter 'vc help' for more information\n"
 		exit
 		;;
 esac
@@ -538,7 +514,7 @@ elif [ $action == 'display' ]; then
 	display
 
 elif [ $action == 'help' ]; then
-	man
+	help
 fi
 
 
