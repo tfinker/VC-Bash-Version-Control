@@ -258,7 +258,7 @@ function merge {
 				cp .staging/$1 .commit/$2/.$1.merging
 				compare=$(diff -q .commit/$2/.$1.merging .commit/$2/$1)
 				while [[ $compare != ""  ]]; do
-					diff ".commit/$2/$1" ".commit/$2/.$1.merging" | awk -f awkdiff
+					diff ".commit/$2/$1" ".commit/$2/.$1.merging" | awk -f /usr/bin/awkdiff
 					mergeAction=$(sed "1q;d" .commit/.action.merge)
 					blockMerge $1 $2 $mergeAction 
 					compare=$(diff -q .commit/$2/.$1.merging .commit/$2/$1)
@@ -378,6 +378,9 @@ function display {
 			last) listLastCommit ;;
 			commits) listCommits;;
 		esac
+		if [[ ${#fileDir[@]} -eq 0 ]]; then
+			exit
+		fi
 	      	read -p "Please enter a file number to view file: " userAction
 		length=($(wc -l ${fileDir[$userAction]}))
 		if [[ ${length[0]} -lt 30 ]]; then
