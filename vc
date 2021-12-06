@@ -1,12 +1,20 @@
 #!/bin/bash
 
+################################################
+# vc version control
+# Author: Finlay Kerr w1863883
+################################################
+
 function add {
+# Add a file to the staging area (.staging folder)
+# Input: argArray (array)
 
 	if [[ ${#argArray[@]} -eq 0 ]];then
 		printf "Add: No arguments provided\n"
 		exit 0
 	fi
 
+	# process argArray keys
 	if [[ -v "argArray[clear]" ]]; then
 		if [[ -d '.staging' ]]; then
 			rm -r .staging
@@ -42,15 +50,17 @@ function add {
 }
 
 function listStaging {
+# Display numbered files in .staging folder and save them to a global index array
+# Input: none
 
 	printf "Files in staging \n"	
 	printf "\n"
-	unset fileDir
 	if [[ -d './.staging' ]]; then
 		index=0
 		files=($(ls ./.staging))
 		for line in ${files[@]}; do
 			printf "\t- $index: $line\n"
+			# Add full file path to global fileDir indexed array for display function
 			fileDir[index]=".staging/$line"
 			(( index = index+1 ))
 		done
@@ -61,6 +71,8 @@ function listStaging {
 }
 
 function listLastCommit {
+# Display numbered files from the last commit and save them to a global index array
+# Input: none
 	printf "Files in last commit \n"	
 	printf "\n"
 	if [[ -d './.commit' ]]; then
@@ -68,10 +80,10 @@ function listLastCommit {
 		if [[ ! -z $commits ]];then
 			files=($(ls .commit/${commits[0]}/))		
 			index=0
-			unset fileDir
 			printf "Files in last commit '${commits[0]}':\n"
 			for line in ${files[@]}; do
 				printf "\t- $index: $line\n"
+				# Add full file path to global fileDir indexed array for display function
 				fileDir[index]=".commit/${commits[0]}/$line"
 				(( index = index+1 ))
 			done
@@ -86,13 +98,14 @@ function listLastCommit {
 }
 
 function listCommits {
+# Display numbered files from a user-specified folder and save them to a global index array
+# Input: none
 	printf "Files in commit \n"	
 	printf "\n"
 	if [[ -d './.commit' ]]; then
 		commits=($(ls .commit/ | sort -r))
 		if [[ ! -z $commits ]]; then
 			printf "Select a commit to view: \n"
-			unset fileDir
 			index=1
 			for commit in ${commits[@]}; do
 				printf "\t$index: $commit\n"
@@ -107,6 +120,7 @@ function listCommits {
 			printf "Files in commit: '${commits[$choice]}'\n"
 			for file in ${files[@]}; do
 				printf "\t- $index: $file\n"
+				# Add full file path to global fileDir indexed array for display function
 				fileDir[index]=".commit/${commits[$choice]}/$file"
 				(( index = index +1 ))
 			done
@@ -122,6 +136,8 @@ function listCommits {
 
 
 function list {
+# Intermediary function that picks the correct list function based on the argArray flags
+# Input: argArray (array)
 	if test ${#argArray[@]}  -gt 0; then
 		for arg in ${!argArray[@]}; do
 			case $arg in
@@ -137,7 +153,8 @@ function list {
 }
 
 function commit {
-#	echo 'commit function'
+# Create a commit using the files in the .staging folder. If there are file clashes, go to merge function to resolve conflicts
+# Input: argArray (array)
 	
 	if [[ ${#argArray[@]} -eq 0 ]];then
 		printf "Commit: no arguments provided\n"
@@ -162,7 +179,11 @@ function commit {
 	commitDate=$(date)
 	mkdir -p ./.commit
 	commitDirs=($(ls ./.commit))
-		
+	
+	# Clean up section: if a user has previously quit vc during a commit
+	# this section will delete the incomplete commit/merge before copying
+	# the last commit to a new folder for comparison with the files in .staging
+
 	lastCommit=0
 	for commit in ${commitDirs[@]}; do
 
@@ -170,14 +191,12 @@ function commit {
 		if [[ $result == 'ready' ]]; then
 			dir=${commit:1}
 			if [[ $dir -gt $lastCommit ]]; then
-				#echo "last commit $lastCommit dir $dir"
 				lastCommit=$dir
 			fi
 		fi
 	done
 
 	if [[ $lastCommit -ne 0 ]]; then
-#		echo "last commit found"
 		commitNum=$(($lastCommit +1))
 		commitName="c$commitNum"
 		mkdir -p ./.commit/$commitName
@@ -189,6 +208,8 @@ function commit {
 	
 	stagingfiles=($(ls .staging))
 	commitfiles=($(ls .commit/$commitName))
+
+	# incomplete note used in cleanup unless overwritten by successful commit
 	echo "incomplete" > ./.commit/$commitName/.commitInfo
 	
 	printf "Creating new commit: $commitName \n"
@@ -209,14 +230,17 @@ function commit {
 		fi
 	done
 
+	# Overwrite incomplete message in .commitInfo
 	echo "Commit date: "$commitDate > ./.commit/$commitName/.commitInfo
 	echo "Message: "${argArray[msg]} >> ./.commit/$commitName/.commitInfo
-	#chmod 444 ./.commit/$commitName/
 	rm -r ./.staging
 	echo "Commit complete"
 }
 
 function cleanup {
+# If a commit has an 'incomplete' status in the .commitInfo file, delete the commit
+# Input: 
+# 	1) commitName (string)
 
 	status=($(cat ./.commit/$1/.commitInfo))
 	if [[ ${status[0]} == 'incomplete' ]]; then
@@ -229,7 +253,13 @@ function cleanup {
 }
 
 function merge {
-	
+# Compare the existing and new files and give the user the option to overwrite or merge. If merging
+# iteratively identify the next block of changes and run blockMerge
+# Input:
+# 	1) fileName (string)
+# 	2) commitName (string)
+
+
 	printf "File '$1' exists in last commit "
 	compare=$(diff -q .staging/$1 .commit/$2/$1)
 	if [[ $compare == "" ]]; then
@@ -253,11 +283,12 @@ function merge {
 				printf "Merging $1\n"
 				printf "\n"
 				# create a copy of the staging file
-				# process will iteratively align the commit file and the staging file until there
+				# while loop  will iteratively align the commit file and the copied staging file until there
 				# are no differences left between the two
 				cp .staging/$1 .commit/$2/.$1.merging
 				compare=$(diff -q .commit/$2/.$1.merging .commit/$2/$1)
 				while [[ $compare != ""  ]]; do
+					# awk script produces several hidden files as output for the rest of the script
 					diff ".commit/$2/$1" ".commit/$2/.$1.merging" | awk -f /usr/bin/awkdiff
 					mergeAction=$(sed "1q;d" .commit/.action.merge)
 					blockMerge $1 $2 $mergeAction 
@@ -282,8 +313,17 @@ function merge {
 
 
 function blockMerge {
+# Using the information created by the diff command and processed by the awk script
+# run either add, change or delete and give the user the ability to accept or reject the block of changes
+# Input: 
+# 	1) fileName (string)
+# 	2) commitName (string)
+# 	3) mergeAction (string)
+
 	case $3 in 
 		"a")
+			# Insert lines to existing files using .finish.merge locations from awkdiff script
+
 			finishLocs=($(sed -n "1,2p" .commit/.finish.merge))
 
 			printf "Do you want to add the following lines at line(s): ${finishLocs[0]}-${finishLocs[1]} (Y/n) ?\n "
@@ -294,15 +334,21 @@ function blockMerge {
 			read -p "Enter (Y/n): " userAction
 			case $userAction in
 				[Yy])
-			
+					# We can not insert the lines using sed if the file is shorter than the insert location (finishLocs)
+					# So we need to count lines and compare length with finishLocs, if short, simply append changes to file
+		
 					lines=($(wc -l .commit/$2/$1))
 					if test ${lines[0]} -lt ${finishLocs[0]}; then
+						# .add.merge contains the lines to add, generated by awkdiff script
 						cat .commit/.add.merge >> .commit/$2/$1
 					else			
 						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$2/$1
 					fi
 					;;
 				[Nn])
+					# if the user rejects the additions to the existing file, we need to remove the changes 
+					# from the new file so that the diff command can continue to the next proposed changes
+
 					loc=${finishLocs[0]}","${finishLocs[1]}"d"
 					sed -i $loc .commit/$2/.$1.merging
 					;;
@@ -310,6 +356,7 @@ function blockMerge {
 
 			;;
 		"c")
+			# Change lines in existing file using .start.merge and .finish.merge locations from awkdiff script
 
 			startLocs=($(sed -n "1,2p" .commit/.start.merge))
 			finishLocs=($(sed -n "1,2p" .commit/.finish.merge))	
@@ -322,19 +369,28 @@ function blockMerge {
 			read -p "Enter (Y/n): " userAction
 			case $userAction in 
 				[Yy])
-					
+					# Delete lines from existing file and then add new lines
 					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$2/$1
+					
+					# We can not insert the lines using sed if the file is shorter than the insert location (finishLocs)
+					# So we need to count lines and compare length with finishLocs, if short, simply append changes to file
 					lines=($(wc -l .commit/$2/$1))
 					if test ${lines[0]} -lt ${finishLocs[0]}; then
+						# .add.merge contains the lines to add, generated by awkdiff script
 						cat .commit/.add.merge >> .commit/$2/$1
 					else			
 						cat .commit/.add.merge | sed -i ${finishLocs[0]}'e cat /dev/stdin' .commit/$2/$1
 					fi
 					;;
 				[Nn])
+					# if user rejects the change, we need to do the reverse change so that the diff function in merge can find the next block
 					sed -i "${finishLocs[0]},${finishLocs[1]}d" .commit/$2/.$1.merging
+					
+					# We can not insert the lines using sed if the file is shorter than the insert location (finishLocs)
+					# So we need to count lines and compare length with finishLocs, if short, simply append changes to file
 					lines=($(wc -l .commit/$2/.$1.merging))
 					if test ${lines[0]} -lt ${startLocs[0]}; then
+						# .remove.merge contains the lines to add, generated by awkdiff script
 						cat .commit/.remove.merge >> .commit/$2/.$1.merging
 					else			
 						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/$2/.$1.merging
@@ -343,6 +399,8 @@ function blockMerge {
 			esac
 			;;
 		"d")
+			# Delete line in existing file using .start.merge locations from awkdiff script
+
 			startLocs=($(sed -n "1,2p" .commit/.start.merge))
 			printf "Do you want to delete the following lines at line(s): ${startLocs[0]}-${startLocs[1]} (Y/n) ?\n "
 			printf "\n"
@@ -355,8 +413,14 @@ function blockMerge {
 					sed -i "${startLocs[0]},${startLocs[1]}d" .commit/$2/$1
 					;;
 				[Nn])
+					# if user rejects the deletion, we need to add the lines to the temporary staging file
+				       	# so that the diff function can find the next block
+					
+					# We can not insert the lines using sed if the file is shorter than the insert location (finishLocs)
+					# So we need to count lines and compare length with finishLocs, if short, simply append changes to file
 					lines=($(wc -l .commit/$2/.$1.merging))
 					if test ${lines[0]} -lt ${startLocs[0]}; then
+						# .remove.merge contains the lines to add, generated by awkdiff script
 						cat .commit/.remove.merge >> .commit/$2/.$1.merging
 					else			
 						cat .commit/.remove.merge | sed -i ${startLocs[0]}'e cat /dev/stdin' .commit/$2/.$1.merging
@@ -371,26 +435,35 @@ function blockMerge {
 }
 
 function display {
+# Based on the flag, provide a numbered list to the user and allow them to choose a file. The file will be displayed 30 lines per key press
+# Input: argArray (array)
+
 
 	if test ${#argArray[@]} -eq 1; then
 		case ${!argArray[@]} in
 			staging) listStaging ;;
 			last) listLastCommit ;;
-			commits) listCommits;;
+			commits) listCommits ;;
 		esac
+	
+		# if global indexed array fileDir is empty, there are no files to view
 		if [[ ${#fileDir[@]} -eq 0 ]]; then
 			exit
 		fi
-	      	read -p "Please enter a file number to view file: " userAction
+	
+		read -p "Please enter a file number to view file: " userAction
 		length=($(wc -l ${fileDir[$userAction]}))
+	
 		if [[ ${length[0]} -lt 30 ]]; then
 			increment=${length[0]}
 		else
 			increment=30
 		fi
+	
 		printf "Printing file: ${fileDir[$userAction]}\n"
 		printf "Press any key to cycle through pages\n"
 		printf "Number of lines in file: ${length[0]}\n"
+	
 		for (( i=1 ; i <= ${length[0]};i=$(($i+$increment)) )); do
 			end=$(($i+$increment))
 			cat ${fileDir[$userAction]} | awk 'NR >='$i' && NR <'$end' {print NR":",$0}'
@@ -407,6 +480,8 @@ function display {
 }
 
 function help {
+# Display a help message
+# Input: none
 	printf "vc help\n
 Usage: vc [COMMAND] [OPTION]
 	Description: Version control your files with vc
@@ -444,6 +519,11 @@ Command: vc display
 }
 
 
+############################################################################################
+## Initialisation
+############################################################################################
+
+# If there are no parameters, display message and exit
 if [[ $# -eq 0 ]];
 then
 	printf "vc\nNo parameters provided\n\n"
@@ -451,6 +531,7 @@ then
 	exit 0
 fi
 
+# If command not in list, display message and exit
 case $1 in
 	"add"|"list"|"commit"|"display"|"help")
 		action=$1
@@ -462,7 +543,9 @@ case $1 in
 		;;
 esac
 
+# fileDir used by list sub-functions and display function
 declare -a fileDir
+# argArray used for provided flags to functions
 declare -A argArray
 
 if [ $action == 'add' ]; then
@@ -470,10 +553,15 @@ if [ $action == 'add' ]; then
 	while getopts 'caf:' flag; do
 		case $flag in
 			a)
+				# if the user specifies -a, it overrides the other flags
 				argArray[all]=true 
 				if [[ -v "argArray[file]" ]]; then
 					unset $argArray[file]
 				fi
+				if [[ -v "argArray[clear]" ]]; then
+					unset $argArray[clear]
+				fi
+
 				break
 				;;
 				
