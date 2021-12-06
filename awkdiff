@@ -1,4 +1,7 @@
 #!/bin/awk
+
+# Isolate the first block of a diff command and create output files  
+
 BEGIN {
 	block=0
 	system("rm -f .commit/.action.merge")
@@ -8,60 +11,47 @@ BEGIN {
 	system("rm -f .commit/.add.merge")
 	system("rm -f .commit/.display.merge")
 }
-#{printf("%s %s", $0, "\n")}
- 	{
+	{
 		if ($0 ~ /[0-9]{1}(,[0-9])?[acd]{1}[0-9]{1}(,[0-9])?/ && block == 1){
-
-			#printf("%s %s %s", $0, "exit", "\n")
+			# block complete
 			exit
 		}
 		if($0 ~ /[0-9]{1}(,[0-9])?[acd]{1}[0-9]{1}(,[0-9])?/ && block == 0){
-			#<printf("%s", "block\n")
+			# first block matched
 			block=1
-			match($0, /[acd]/, action)
-			split($0, lines, /[acd]/)
-	#		printf("%s %s %s%s", lines[1], action[0], lines[2],"\n")
+			match($0, /[acd]/, action) # pull out action
+			split($0, lines, /[acd]/) # pull out line numbers
 		}
-	 }
-#NF>0	{printf("%s %s", $0, "\n")}
- 	{if($1 ~ /</){ 
-		print substr($0,3) >> ".commit/.remove.merge"
-	}}
- 	{if($1 ~ />/){ 
-		print substr($0,3) >> ".commit/.add.merge"
-	}}
-NR>1 {print "\t"$0 >> ".commit/.display.merge"}
+	}
+	# Remove diff formatting for actual merging
+	{if($1 ~ /</){	print substr($0,3) >> ".commit/.remove.merge"	}}
+	{if($1 ~ />/){ 	print substr($0,3) >> ".commit/.add.merge"	}}
+
+	# Keep diff formatting to display to user
+NR>1 	{print "\t"$0 >> ".commit/.display.merge"}
+
 END {
-#	printf("%s%s", action[0], "\n")
 	print action[0] >> ".commit/.action.merge"
-	
 	
 	# create a uniform line format ("start,end")
 	if ( lines[1] ~ /[,]/ ) {
-	#	printf("%s%s", lines[1], "\n")
 		split (lines[1], rlines, /[,]/)
 		print rlines[1] >> ".commit/.start.merge"
 		print rlines[2] >> ".commit/.start.merge"
 	}
 	else { 
-	#	printf("%s%s", lines[1]","lines[1], "\n")
 		print lines[1] >> ".commit/.start.merge"
 		print lines[1] >> ".commit/.start.merge"
-	       
 	}
 	if ( lines[2] ~ /[,]/ ) {
-	#	printf("%s%s", lines[2], "\n")
 		split (lines[2], alines, /[,]/)
 		print alines[1] >> ".commit/.finish.merge"
 		print alines[2] >> ".commit/.finish.merge"
-
 	}
 	else {  
-	#	printf("%s%s", lines[2]","lines[2], "\n")
 		print lines[2] >> ".commit/.finish.merge"
 		print lines[2] >> ".commit/.finish.merge"
 	}
-		
 }
 
 
