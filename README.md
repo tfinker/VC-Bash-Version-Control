@@ -33,9 +33,11 @@ Command: vc display<br/>
 	Description: Display paginated contents of staged and committed files <br/>
 		in the repository<br/>
 	Usage:<br/>
-		vc display -s 	(choose a file to view from staging)<br/>
-		vc display -l 	(choose a file to view from the last commit)<br/>
-		vc display -c 	(choose a file to view from any commit)<br/>
+    <ul>
+		<li>vc display -s 	(choose a file to view from staging)</li>
+		<li>vc display -l 	(choose a file to view from the last commit)</li>
+		<li>vc display -c 	(choose a file to view from any commit)</li>
+    </ul>
 
 To run:
 1) Download and cd to folder
