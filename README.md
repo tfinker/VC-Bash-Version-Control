@@ -6,8 +6,8 @@ Module: Software Development Environments
 
 Task: Create a local version control system in Bash with five commands: add, list, commit, display and help
 
-Usage: vc [COMMAND] [OPTION]
-	Description: Version control your files with vc
+Usage: vc [COMMAND] [OPTION]\n
+	Description: Version control your files with vc\n
 
 Command: vc add
 	Description: Add files to staging area
